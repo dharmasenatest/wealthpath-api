@@ -1,0 +1,372 @@
+{
+  "info": {
+    "name":        "WealthPath Assessment API",
+    "description": "Complete Postman collection for the WealthPath Flutter Technical Assessment backend.\n\nSet the `baseUrl` variable to your hosted or local URL before running.\n\nDefault local: http://localhost:3000/api/v1",
+    "schema":      "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "wealthpath-assessment-api-v2"
+  },
+  "variable": [
+    { "key": "baseUrl",   "value": "http://localhost:3000/api/v1", "type": "string" },
+    { "key": "budgetId",  "value": "bud_001",                      "type": "string" },
+    { "key": "spendingId","value": "",                              "type": "string" }
+  ],
+  "item": [
+
+    {
+      "name": "🩺 Admin",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url":    "{{baseUrl}}/health",
+            "description": "Verify the service is running. Returns record counts."
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Has status ok', () => pm.expect(pm.response.json().status).to.eql('ok'));"
+          ]}}]
+        },
+        {
+          "name": "Get Simulation Config",
+          "request": {
+            "method": "GET",
+            "url":    "{{baseUrl}}/config",
+            "description": "Returns current DELAY_MS, FAILURE_RATE, and OFFLINE_MODE settings."
+          }
+        },
+        {
+          "name": "Reseed All Data",
+          "request": {
+            "method": "POST",
+            "url":    "{{baseUrl}}/reseed",
+            "description": "Resets spending + budget data to fresh generated values. Run this at the start of a new assessment session."
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "💸 Spending — Section 1",
+      "item": [
+        {
+          "name": "List Spending (page 1)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw":   "{{baseUrl}}/spending?page=1&limit=20",
+              "host":  ["{{baseUrl}}"],
+              "path":  ["spending"],
+              "query": [
+                { "key": "page",  "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            },
+            "description": "Section 1 — main list endpoint. Returns latest-first paginated records + total."
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.test('Has data array',   () => pm.expect(body.data).to.be.an('array'));",
+            "pm.test('Has total',        () => pm.expect(body.total).to.be.a('number'));",
+            "pm.test('Has hasMore flag', () => pm.expect(body.hasMore).to.be.a('boolean'));",
+            "pm.test('Has 20 records',   () => pm.expect(body.data.length).to.eql(20));",
+            "// Save first id for later tests",
+            "if (body.data.length > 0) pm.collectionVariables.set('spendingId', body.data[0].id);"
+          ]}}]
+        },
+        {
+          "name": "List Spending (page 2)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw":   "{{baseUrl}}/spending?page=2&limit=20",
+              "host":  ["{{baseUrl}}"],
+              "path":  ["spending"],
+              "query": [
+                { "key": "page",  "value": "2" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Spending (small limit — pagination test)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw":   "{{baseUrl}}/spending?page=1&limit=5",
+              "host":  ["{{baseUrl}}"],
+              "path":  ["spending"],
+              "query": [
+                { "key": "page",  "value": "1" },
+                { "key": "limit", "value": "5" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Spending Record",
+          "request": {
+            "method": "POST",
+            "url":    "{{baseUrl}}/spending",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"merchant\": \"FreshFields\",\n  \"amount\": 47.80,\n  \"category\": \"Groceries\",\n  \"currency\": \"USD\"\n}"
+            },
+            "description": "Section 1 — optimistic add. In your Flutter app, add the item to the UI list BEFORE calling this endpoint. Roll back if this returns an error."
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+            "const body = pm.response.json();",
+            "pm.test('Has id',       () => pm.expect(body.id).to.be.a('string'));",
+            "pm.test('Has merchant', () => pm.expect(body.merchant).to.eql('FreshFields'));",
+            "pm.test('Has date',     () => pm.expect(body.date).to.be.a('string'));",
+            "pm.collectionVariables.set('spendingId', body.id);"
+          ]}}]
+        },
+        {
+          "name": "Create Spending — Validation Error (missing amount)",
+          "request": {
+            "method": "POST",
+            "url":    "{{baseUrl}}/spending",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"merchant\": \"Supermart\",\n  \"category\": \"Groceries\"\n}"
+            },
+            "description": "Should return 422 with validation details."
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 422', () => pm.response.to.have.status(422));",
+            "pm.test('Has code VALIDATION_ERROR', () => pm.expect(pm.response.json().code).to.eql('VALIDATION_ERROR'));"
+          ]}}]
+        },
+        {
+          "name": "Get Single Spending Record",
+          "request": {
+            "method": "GET",
+            "url":    "{{baseUrl}}/spending/{{spendingId}}",
+            "description": "Fetch the record created/saved in the previous step."
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('ID matches', () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('spendingId')));"
+          ]}}]
+        },
+        {
+          "name": "Delete Spending Record (cleanup)",
+          "request": {
+            "method": "DELETE",
+            "url":    "{{baseUrl}}/spending/{{spendingId}}",
+            "description": "Cleanup helper — simulates the rollback side of an optimistic add."
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 204', () => pm.response.to.have.status(204));"
+          ]}}]
+        },
+        {
+          "name": "Get Deleted Record — 404",
+          "request": {
+            "method": "GET",
+            "url":    "{{baseUrl}}/spending/{{spendingId}}"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 404', () => pm.response.to.have.status(404));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "📊 Budgets — Section 2",
+      "item": [
+        {
+          "name": "List Budgets (page 1)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw":   "{{baseUrl}}/budgets?page=1&limit=20",
+              "host":  ["{{baseUrl}}"],
+              "path":  ["budgets"],
+              "query": [
+                { "key": "page",  "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            },
+            "description": "Section 2 — main list for Budget Overview screen. Includes over-budget categories."
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.test('Has data array',   () => pm.expect(body.data).to.be.an('array'));",
+            "pm.test('Has hasMore flag', () => pm.expect(body.hasMore).to.be.a('boolean'));",
+            "// Verify over-budget record exists",
+            "const overBudget = body.data.find(b => b.spent > b.limit);",
+            "pm.test('Has over-budget category', () => pm.expect(overBudget).to.not.be.undefined);"
+          ]}}]
+        },
+        {
+          "name": "List Budgets (page 2 — hasMore: false)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw":   "{{baseUrl}}/budgets?page=2&limit=20",
+              "host":  ["{{baseUrl}}"],
+              "path":  ["budgets"],
+              "query": [
+                { "key": "page",  "value": "2" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('hasMore is false on last page', () => pm.expect(pm.response.json().hasMore).to.be.false);"
+          ]}}]
+        },
+        {
+          "name": "Get Single Budget",
+          "request": {
+            "method": "GET",
+            "url":    "{{baseUrl}}/budgets/{{budgetId}}",
+            "description": "Fetch Groceries budget (bud_001)."
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Has category', () => pm.expect(pm.response.json().category).to.be.a('string'));"
+          ]}}]
+        },
+        {
+          "name": "Update Budget Limit (success)",
+          "request": {
+            "method": "PATCH",
+            "url":    "{{baseUrl}}/budgets/{{budgetId}}",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"limit\": 450.00\n}"
+            },
+            "description": "Section 2 — optimistic update. Update the local cache BEFORE calling this. On success, confirm with the returned value."
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Limit updated', () => pm.expect(pm.response.json().limit).to.eql(450.00));"
+          ]}}]
+        },
+        {
+          "name": "Update Budget Limit — Force Fail (rollback test) ⚠️",
+          "request": {
+            "method": "PATCH",
+            "url":    "{{baseUrl}}/budgets/{{budgetId}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Force-Fail", "value": "true", "description": "Causes the server to return 500 — triggers rollback in Flutter BLoC" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"limit\": 999.00\n}"
+            },
+            "description": "⚠️ ROLLBACK TEST: The server will return 500. Your BLoC should revert the optimistic state update when this happens."
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 500', () => pm.response.to.have.status(500));",
+            "pm.test('Has FORCED_FAILURE code', () => pm.expect(pm.response.json().code).to.eql('FORCED_FAILURE'));"
+          ]}}]
+        },
+        {
+          "name": "Update Budget — Missing limit field (422)",
+          "request": {
+            "method": "PATCH",
+            "url":    "{{baseUrl}}/budgets/{{budgetId}}",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 422', () => pm.response.to.have.status(422));"
+          ]}}]
+        },
+        {
+          "name": "Get Budget — Not Found (404)",
+          "request": {
+            "method": "GET",
+            "url":    "{{baseUrl}}/budgets/bud_999"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 404', () => pm.response.to.have.status(404));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "🔬 Simulation Scenarios",
+      "description": "Use these to test offline-first behaviour, error handling, and retry strategies.",
+      "item": [
+        {
+          "name": "Offline Mode Check — GET Spending",
+          "request": {
+            "method": "GET",
+            "url":    "{{baseUrl}}/spending?page=1&limit=5",
+            "description": "If OFFLINE_MODE=true on the server, this returns 503. Your Flutter app should serve Hive/Drift cache and show the offline banner."
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "const status = pm.response.code;",
+            "pm.test('200 (online) or 503 (offline mode)', () => pm.expect([200, 503]).to.include(status));",
+            "if (status === 503) {",
+            "  pm.test('Has OFFLINE_MODE code', () => pm.expect(pm.response.json().code).to.eql('OFFLINE_MODE'));",
+            "}"
+          ]}}]
+        },
+        {
+          "name": "Large Page — All Budgets (single request)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw":   "{{baseUrl}}/budgets?page=1&limit=100",
+              "host":  ["{{baseUrl}}"],
+              "path":  ["budgets"],
+              "query": [
+                { "key": "page",  "value": "1" },
+                { "key": "limit", "value": "100" }
+              ]
+            },
+            "description": "Returns all 24 budget categories in one page — useful for populating full offline cache."
+          }
+        },
+        {
+          "name": "Large Page — All Spending (first 100)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw":   "{{baseUrl}}/spending?page=1&limit=100",
+              "host":  ["{{baseUrl}}"],
+              "path":  ["spending"],
+              "query": [
+                { "key": "page",  "value": "1" },
+                { "key": "limit", "value": "100" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Check Config (active simulation settings)",
+          "request": {
+            "method": "GET",
+            "url":    "{{baseUrl}}/config"
+          }
+        },
+        {
+          "name": "Reseed — Fresh Data",
+          "request": {
+            "method": "POST",
+            "url":    "{{baseUrl}}/reseed",
+            "description": "Resets all data. Use before starting a new assessment session."
+          }
+        }
+      ]
+    }
+
+  ]
+}

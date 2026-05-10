@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: wealthpath-assessment-api
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DELAY_MS
+        value: 400
+      - key: DELAY_JITTER
+        value: 200
+      - key: FAILURE_RATE
+        value: 0
+      - key: OFFLINE_MODE
+        value: false
