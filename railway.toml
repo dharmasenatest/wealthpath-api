@@ -6,6 +6,3 @@ startCommand = "npm start"
 healthcheckPath = "/api/v1/health"
 healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
-
-[environment]
-PORT = "3000"
