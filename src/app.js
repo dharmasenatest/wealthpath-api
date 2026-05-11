@@ -79,12 +79,12 @@ app.use(notFound);
 app.use(errorHandler);
 
 // ── Start ─────────────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log('');
   console.log('╔══════════════════════════════════════════════════════╗');
   console.log('║       WealthPath Assessment API  v2.0.0              ║');
   console.log('╠══════════════════════════════════════════════════════╣');
-  console.log(`║  Listening on  http://localhost:${PORT}                  ║`);
+  console.log(`║  Listening on  http://0.0.0.0:${PORT}                    ║`);
   console.log(`║  Docs          http://localhost:${PORT}/docs             ║`);
   console.log(`║  Health        http://localhost:${PORT}/api/v1/health    ║`);
   console.log('╠══════════════════════════════════════════════════════╣');
@@ -94,5 +94,17 @@ app.listen(PORT, () => {
   console.log('╚══════════════════════════════════════════════════════╝');
   console.log('');
 });
+
+// ── Graceful shutdown (required for Railway/Docker) ───────────────────────────
+function shutdown(signal) {
+  console.log(`\n[${signal}] Shutting down gracefully…`);
+  server.close(() => {
+    console.log('Server closed.');
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(1), 10_000);
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT',  () => shutdown('SIGINT'));
 
 module.exports = app;
